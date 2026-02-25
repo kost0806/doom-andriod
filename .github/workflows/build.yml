@@ -31,37 +31,7 @@ jobs:
           distribution: 'temurin'
 
       # ------------------------------------------------------------------ #
-      # 3. Set up Gradle (downloads Gradle without needing wrapper JAR)
-      # ------------------------------------------------------------------ #
-      - name: Set up Gradle
-        uses: gradle/actions/setup-gradle@v3
-        with:
-          gradle-version: '8.2.1'
-
-      # ------------------------------------------------------------------ #
-      # 4. Install Android SDK components
-      #    ubuntu-latest ships ANDROID_SDK_ROOT already set up.
-      #    We just need the right NDK and CMake versions.
-      # ------------------------------------------------------------------ #
-      - name: Install NDK and CMake
-        run: |
-          echo "y" | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager \
-            "ndk;25.2.9519653" \
-            "cmake;3.22.1" \
-            --sdk_root=$ANDROID_SDK_ROOT
-
-      # ------------------------------------------------------------------ #
-      # 5. Create local.properties so Gradle can find the SDK / NDK
-      # ------------------------------------------------------------------ #
-      - name: Create local.properties
-        run: |
-          cat > local.properties << EOF
-          sdk.dir=$ANDROID_SDK_ROOT
-          ndk.dir=$ANDROID_SDK_ROOT/ndk/25.2.9519653
-          EOF
-
-      # ------------------------------------------------------------------ #
-      # 6. Cache Gradle dependencies for faster subsequent builds
+      # 3. Cache Gradle dependencies for faster subsequent builds
       # ------------------------------------------------------------------ #
       - name: Cache Gradle packages
         uses: actions/cache@v4
@@ -74,23 +44,52 @@ jobs:
             ${{ runner.os }}-gradle-
 
       # ------------------------------------------------------------------ #
-      # 7. Build debug APK  (no signing key needed)
+      # 4. Set up Gradle 8.2.1
+      # ------------------------------------------------------------------ #
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '8.2.1'
+
+      # ------------------------------------------------------------------ #
+      # 5. Accept all Android SDK licenses upfront
+      # ------------------------------------------------------------------ #
+      - name: Accept Android SDK Licenses
+        run: yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --licenses || true
+
+      # ------------------------------------------------------------------ #
+      # 6. Install Android SDK components
+      #    ubuntu-latest ships ANDROID_SDK_ROOT already set up.
+      #    We just need the right NDK and CMake versions.
+      # ------------------------------------------------------------------ #
+      - name: Install NDK and CMake
+        run: |
+          yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager \
+            "ndk;25.2.9519653" \
+            "cmake;3.22.1"
+
+      # ------------------------------------------------------------------ #
+      # 7. Create local.properties so Gradle can find the SDK / NDK
+      # ------------------------------------------------------------------ #
+      - name: Create local.properties
+        run: |
+          echo "sdk.dir=$ANDROID_SDK_ROOT" > local.properties
+          echo "ndk.dir=$ANDROID_SDK_ROOT/ndk/25.2.9519653" >> local.properties
+
+      # ------------------------------------------------------------------ #
+      # 8. Build debug APK  (no signing key needed)
       # ------------------------------------------------------------------ #
       - name: Build Debug APK
         run: gradle :app:assembleDebug --no-daemon --stacktrace
-        env:
-          ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}
 
       # ------------------------------------------------------------------ #
-      # 8. Build release APK (signed with debug key for now)
+      # 9. Build release APK (signed with debug key for now)
       # ------------------------------------------------------------------ #
       - name: Build Release APK
         run: gradle :app:assembleRelease --no-daemon --stacktrace
-        env:
-          ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}
 
       # ------------------------------------------------------------------ #
-      # 9. Rename APKs with version info
+      # 10. Rename APKs with version info
       # ------------------------------------------------------------------ #
       - name: Rename APKs
         run: |
@@ -104,7 +103,7 @@ jobs:
              artifacts/DOOM-Android-${VERSION}-release.apk 2>/dev/null || true
 
       # ------------------------------------------------------------------ #
-      # 10. Upload APK as build artifact (available for every push/run)
+      # 11. Upload APK as build artifact (available for every push/run)
       # ------------------------------------------------------------------ #
       - name: Upload APK artifacts
         uses: actions/upload-artifact@v4
@@ -114,7 +113,7 @@ jobs:
           retention-days: 30
 
       # ------------------------------------------------------------------ #
-      # 11. Create GitHub Release when a version tag is pushed
+      # 12. Create GitHub Release when a version tag is pushed
       # ------------------------------------------------------------------ #
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
