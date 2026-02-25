@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Alias for legacy devices that don't support adaptive icons -->
+    <drawable name="ic_launcher">@drawable/ic_launcher_background</drawable>
+    <drawable name="ic_launcher_round">@drawable/ic_launcher_background</drawable>
+</resources>

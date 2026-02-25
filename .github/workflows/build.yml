@@ -1,0 +1,168 @@
+name: Build & Release DOOM Android APK
+
+on:
+  push:
+    tags:
+      - 'v*'          # Trigger on version tags like v1.0, v1.2.3
+  workflow_dispatch:   # Allow manual trigger from the Actions tab
+
+jobs:
+  build:
+    name: Build APK
+    runs-on: ubuntu-latest
+
+    steps:
+      # ------------------------------------------------------------------ #
+      # 1. Checkout repo with all submodules (doomgeneric)
+      # ------------------------------------------------------------------ #
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      # ------------------------------------------------------------------ #
+      # 2. Set up Java 17 (required for AGP 8.x)
+      # ------------------------------------------------------------------ #
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+
+      # ------------------------------------------------------------------ #
+      # 3. Set up Gradle (downloads Gradle without needing wrapper JAR)
+      # ------------------------------------------------------------------ #
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v3
+        with:
+          gradle-version: '8.2.1'
+
+      # ------------------------------------------------------------------ #
+      # 4. Install Android SDK components
+      #    ubuntu-latest ships ANDROID_SDK_ROOT already set up.
+      #    We just need the right NDK and CMake versions.
+      # ------------------------------------------------------------------ #
+      - name: Install NDK and CMake
+        run: |
+          echo "y" | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager \
+            "ndk;25.2.9519653" \
+            "cmake;3.22.1" \
+            --sdk_root=$ANDROID_SDK_ROOT
+
+      # ------------------------------------------------------------------ #
+      # 5. Create local.properties so Gradle can find the SDK / NDK
+      # ------------------------------------------------------------------ #
+      - name: Create local.properties
+        run: |
+          cat > local.properties << EOF
+          sdk.dir=$ANDROID_SDK_ROOT
+          ndk.dir=$ANDROID_SDK_ROOT/ndk/25.2.9519653
+          EOF
+
+      # ------------------------------------------------------------------ #
+      # 6. Cache Gradle dependencies for faster subsequent builds
+      # ------------------------------------------------------------------ #
+      - name: Cache Gradle packages
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+
+      # ------------------------------------------------------------------ #
+      # 7. Build debug APK  (no signing key needed)
+      # ------------------------------------------------------------------ #
+      - name: Build Debug APK
+        run: gradle :app:assembleDebug --no-daemon --stacktrace
+        env:
+          ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}
+
+      # ------------------------------------------------------------------ #
+      # 8. Build release APK (signed with debug key for now)
+      # ------------------------------------------------------------------ #
+      - name: Build Release APK
+        run: gradle :app:assembleRelease --no-daemon --stacktrace
+        env:
+          ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}
+
+      # ------------------------------------------------------------------ #
+      # 9. Rename APKs with version info
+      # ------------------------------------------------------------------ #
+      - name: Rename APKs
+        run: |
+          VERSION="${GITHUB_REF_NAME:-dev}"
+          mkdir -p artifacts
+          cp app/build/outputs/apk/debug/app-debug.apk \
+             artifacts/DOOM-Android-${VERSION}-debug.apk
+          cp app/build/outputs/apk/release/app-release.apk \
+             artifacts/DOOM-Android-${VERSION}-release.apk 2>/dev/null || \
+          cp app/build/outputs/apk/release/app-release-unsigned.apk \
+             artifacts/DOOM-Android-${VERSION}-release.apk 2>/dev/null || true
+
+      # ------------------------------------------------------------------ #
+      # 10. Upload APK as build artifact (available for every push/run)
+      # ------------------------------------------------------------------ #
+      - name: Upload APK artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: doom-android-apk
+          path: artifacts/*.apk
+          retention-days: 30
+
+      # ------------------------------------------------------------------ #
+      # 11. Create GitHub Release when a version tag is pushed
+      # ------------------------------------------------------------------ #
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          name: DOOM Android ${{ github.ref_name }}
+          tag_name: ${{ github.ref_name }}
+          draft: false
+          prerelease: false
+          body: |
+            ## DOOM for Android ${{ github.ref_name }}
+
+            A port of the classic DOOM (1993) to Android using [doomgeneric](https://github.com/ozkl/doomgeneric).
+
+            ### Requirements
+
+            This APK does **not** include game data. You need a DOOM WAD file:
+
+            | WAD | Source |
+            |-----|--------|
+            | `doom1.wad` | [Shareware (free)](https://www.doomworld.com/classicdoom/info/shareware.php) |
+            | `doom.wad`  | DOOM (1993) – commercial |
+            | `doom2.wad` | DOOM II – commercial |
+
+            ### Installation
+
+            1. Install the APK (enable "Install from unknown sources" if needed).
+            2. Copy your WAD file to:
+               ```
+               /sdcard/Android/data/com.doom.android/files/
+               ```
+               or directly to `/sdcard/` (root of internal storage).
+            3. Launch **DOOM** from your app drawer.
+
+            ### Controls
+
+            Touch controls are displayed on screen:
+
+            | Button | Action |
+            |--------|--------|
+            | ▲ / ▼ / ◀ / ▶ | Move / Turn |
+            | SL / SR | Strafe left / right |
+            | FIRE | Shoot |
+            | USE | Open door / activate |
+            | RUN | Hold to run |
+            | MAP | Automap toggle |
+            | ESC | Menu |
+
+          files: artifacts/*.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

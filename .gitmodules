@@ -1,0 +1,3 @@
+[submodule "app/src/main/cpp/doomgeneric"]
+	path = app/src/main/cpp/doomgeneric
+	url = https://github.com/ozkl/doomgeneric
