@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Simple skull silhouette for DOOM launcher icon -->
+    <path
+        android:fillColor="#FF0000"
+        android:pathData="M54,10 C35,10 20,25 20,44 C20,55 26,65 35,71 L35,80 L45,80 L45,90 L63,90 L63,80 L73,80 L73,71 C82,65 88,55 88,44 C88,25 73,10 54,10 Z"/>
+    <path
+        android:fillColor="#000000"
+        android:pathData="M38,40 C38,35 42,31 47,31 C52,31 56,35 56,40 C56,45 52,49 47,49 C42,49 38,45 38,40 Z"/>
+    <path
+        android:fillColor="#000000"
+        android:pathData="M52,40 C52,35 56,31 61,31 C66,31 70,35 70,40 C70,45 66,49 61,49 C56,49 52,45 52,40 Z"/>
+</vector>
